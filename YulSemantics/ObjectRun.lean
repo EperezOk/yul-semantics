@@ -79,7 +79,7 @@ theorem readBytes_copyInto (mem : Nat → UInt8) (bytes : List UInt8) (t off sz 
   intro i hi
   simp only [List.mem_range] at hi
   simp only [copyInto]
-  rw [if_pos (by omega)]
+  rw [ite_eq_left (by omega)]
   congr 1
   omega
 

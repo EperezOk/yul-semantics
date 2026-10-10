@@ -247,7 +247,7 @@ example (external : ExternalCalls) (st : EvmState) (response : CallResponse)
     (evmWithCalls external).Builtin .call [1, 2, 3, 0, 0, 0, 0] st
       (.ok [response.flag] (finishCall .call st response 0 0 0 0)) := by
   have hc : ¬ (st.env.static ∧ (3 : U256) ≠ 0) := by simp [hstatic]
-  simp only [evmWithCalls, evmWithExternal, builtinWithExternal, if_neg hc]
+  simp only [evmWithCalls, evmWithExternal, builtinWithExternal, ite_eq_right hc]
   exact ⟨response, hresponse, rfl⟩
 
 example (external : ExternalCalls) (st : EvmState) (g : U256) :
@@ -293,7 +293,7 @@ example (external : ExternalCalls) (st : EvmState) (g : U256) (response : CallRe
       (.ok [response.flag] (finishCall .call st response 0 0 0 0)) := by
   refine ⟨⟨g, trivial, rfl⟩, ?_⟩
   have hc : ¬ (st.env.static ∧ (3 : U256) ≠ 0) := by simp [hstatic]
-  simp only [evmWithCalls, evmWithExternal, builtinWithExternal, if_neg hc]
+  simp only [evmWithCalls, evmWithExternal, builtinWithExternal, ite_eq_right hc]
   exact ⟨response, hresponse, rfl⟩
 
 example (response : CreateResponse) (address : U256)
@@ -334,7 +334,7 @@ example (creates : ExternalCreates) (st : EvmState) (response : CreateResponse)
     (evmWithExternal ExternalCalls.none creates ExternalGas.any).Builtin .create2 [7, 0, 0, 11] st
       (.ok [response.result] (finishCreate st response 0 0)) := by
   have hc : ¬ (st.env.static = true) := by simp [hstatic]
-  simp only [evmWithExternal, builtinWithExternal, if_neg hc]
+  simp only [evmWithExternal, builtinWithExternal, ite_eq_right hc]
   exact ⟨response, hresponse, rfl⟩
 
 /-- Local writes (in a non-static frame) update both the executing-account view and the global world

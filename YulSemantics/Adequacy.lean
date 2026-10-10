@@ -258,7 +258,7 @@ theorem sound_all (hE : E.Lawful) : ∀ n : Nat,
                               obtain ⟨rfl, rfl, rfl⟩ := h
                               exact Step.ifFalse (ihE _ _ _ _ _ hC) hz
                             · simp only [hC, Result.ok_bind] at h
-                              rw [if_neg hz] at h
+                              rw [ite_eq_right hz] at h
                               exact Step.ifTrue (ihE _ _ _ _ _ hC) hz (ihS _ _ _ _ _ _ _ h)
                 | halt st1 =>
                     simp [hC] at h
@@ -393,7 +393,7 @@ theorem sound_all (hE : E.Lawful) : ∀ n : Nat,
                                       cases op with
                                       | normal =>
                                           simp only [hC, Result.ok_bind] at h
-                                          rw [if_neg hz] at h
+                                          rw [ite_eq_right hz] at h
                                           simp only [hB, Result.ok_bind, hP] at h
                                           exact Step.loopStep (ihE _ _ _ _ _ hC) hz
                                             (ihS _ _ _ _ _ _ _ hB) (Or.inl rfl)
@@ -416,7 +416,7 @@ theorem sound_all (hE : E.Lawful) : ∀ n : Nat,
                                       cases op with
                                       | normal =>
                                           simp only [hC, Result.ok_bind] at h
-                                          rw [if_neg hz] at h
+                                          rw [ite_eq_right hz] at h
                                           simp only [hB, Result.ok_bind, hP] at h
                                           exact Step.loopStep (ihE _ _ _ _ _ hC) hz
                                             (ihS _ _ _ _ _ _ _ hB) (Or.inr rfl)

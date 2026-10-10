@@ -185,7 +185,7 @@ theorem readBytes_storeWord (mem : Nat → UInt8) (v : U256) :
   intro i hi
   rw [List.mem_range] at hi
   simp only [storeWord, Nat.zero_add, Nat.sub_zero]
-  rw [if_pos (by omega)]
+  rw [ite_eq_left (by omega)]
 
 /-- **The contract is correct, for every input.** Reading `n` from calldata, `fibContract` halts
 and returns `fib n` (mod `2^256`) as a big-endian 32-byte word. The prelude (`let n/a/b`) sets up
