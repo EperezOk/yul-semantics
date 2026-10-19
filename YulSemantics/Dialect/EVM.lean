@@ -248,7 +248,7 @@ example (external : ExternalCalls) (st : EvmState) (response : CallResponse)
       (.ok [response.flag] (finishCall .call st response 0 0 0 0)) := by
   have hc : ¬ (st.env.static ∧ (3 : U256) ≠ 0) := by simp [hstatic]
   simp only [evmWithCalls, evmWithExternal, builtinWithExternal, ite_eq_right hc]
-  exact ⟨response, hresponse, rfl⟩
+  exact .inl ⟨response, hresponse, rfl⟩
 
 example (external : ExternalCalls) (st : EvmState) (g : U256) :
     (evmWithCalls external).Builtin .gas [] st (.ok [g] st) := ⟨g, trivial, rfl⟩
@@ -294,7 +294,7 @@ example (external : ExternalCalls) (st : EvmState) (g : U256) (response : CallRe
   refine ⟨⟨g, trivial, rfl⟩, ?_⟩
   have hc : ¬ (st.env.static ∧ (3 : U256) ≠ 0) := by simp [hstatic]
   simp only [evmWithCalls, evmWithExternal, builtinWithExternal, ite_eq_right hc]
-  exact ⟨response, hresponse, rfl⟩
+  exact .inl ⟨response, hresponse, rfl⟩
 
 example (response : CreateResponse) (address : U256)
     (h : response.created = some address) : response.result = address := by
@@ -393,7 +393,7 @@ example (calls : ExternalCalls) (creates : ExternalCreates) (st : EvmState) (res
     builtinWithExternal calls creates gasOracle .call [1, 2, 0, 0, 0, 0, 0] st
       (.ok [response.flag] (finishCall .call st response 0 0 0 0)) := by
   simp only [builtinWithExternal, hstatic]
-  refine ⟨response, hresponse, rfl⟩
+  exact .inl ⟨response, hresponse, rfl⟩
 
 /-- A value-bearing `callcode` delegates to the external relation regardless of the static flag (its
 self-transfer is a no-op, so — unlike `call` — the EVM does not reject it in a static frame). The
@@ -405,7 +405,7 @@ example (calls : ExternalCalls) (creates : ExternalCreates) (st : EvmState) (res
     builtinWithExternal calls creates gasOracle .callcode [1, 2, 3, 0, 0, 0, 0] st
       (.ok [response.flag] (finishCall .callcode st response 0 0 0 0)) := by
   simp only [builtinWithExternal]
-  refine ⟨response, hresponse, rfl⟩
+  exact .inl ⟨response, hresponse, rfl⟩
 
 /-- New effect flags: the static-guarded writers now advertise possible halting. -/
 example : (effects .sstore).halts = true := rfl
@@ -414,5 +414,18 @@ example : (effects .log0).halts = true := rfl
 example : (effects .call).halts = true := rfl
 example : (effects .create).halts = true := rfl
 example : (effects .sstore).writes = true := rfl
+
+/-- An environment may end the calling frame at a call instead of answering it
+(`ExternalCalls.Halt`): the frame halts exceptionally, exposing the data the environment gives. -/
+example (st : EvmState) (hstatic : st.env.static = false) :
+    (evmWithCalls { Call := fun _ _ _ => False, Halt := fun _ _ data => data = [1] }).Builtin
+      .call [1, 2, 3, 0, 0, 0, 0] st (.halt { st with halted := some (.invalid, [1]) }) := by
+  have hc : ¬ (st.env.static ∧ (3 : U256) ≠ 0) := by simp [hstatic]
+  simp only [evmWithCalls, evmWithExternal, builtinWithExternal, ite_eq_right hc]
+  exact .inr ⟨[1], rfl, rfl⟩
+
+/-- No environment of this file uses it: `ExternalCalls.any` answers, and never halts the caller. -/
+example (st : EvmState) (req : CallRequest) (data : List UInt8) :
+    ¬ ExternalCalls.any.Halt req st data := id
 
 end YulSemantics.EVM

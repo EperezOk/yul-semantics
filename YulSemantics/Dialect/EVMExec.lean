@@ -472,6 +472,11 @@ of arbitrary nested calls and re-entrant executions of the caller. -/
 structure ExternalCalls where
   /-- Relates a request and pre-call state to any permitted completed response. -/
   Call : CallRequest → EvmState → CallResponse → Prop
+  /-- The calls at which the environment may instead end the *calling* frame with an exceptional
+  halt (`HaltKind.invalid`) exposing the given data, as a frame that cannot pay for a call runs out
+  of gas. This gas-free semantics never needs it, and every environment of this file leaves it
+  empty; a client can use it to model such a halt, or to mark the calls a proof must reach. -/
+  Halt : CallRequest → EvmState → List UInt8 → Prop := fun _ _ _ => False
 
 namespace ExternalCalls
 
@@ -848,18 +853,26 @@ def stepOp (op : Op) (args : List U256) (st : EvmState) : Option (BuiltinResult 
   | .invalid    => match args with | []     => some (.halt { st with halted := some (.invalid, []) }) | _ => none
 
 /-- Relational execution of one external call after its arguments have been checked. The external
-environment chooses a response; `finishCall` fixes all caller-local consequences. -/
+environment chooses a response, and `finishCall` fixes all caller-local consequences; or, at the
+calls its `Halt` relation admits, it ends the calling frame with an exceptional halt. -/
 def externalCall (external : ExternalCalls) (kind : CallKind) (gas target value : U256)
     (inputOffset inputSize outputOffset outputSize : U256) (st : EvmState)
     (result : BuiltinResult U256 EvmState) : Prop :=
-  ∃ response,
+  (∃ response,
     external.Call
       { kind, gas, target, value,
         input := readBytes st.memory inputOffset.toNat inputSize.toNat }
       st response ∧
     result = .ok [response.flag]
       (finishCall kind st response inputOffset.toNat inputSize.toNat
-        outputOffset.toNat outputSize.toNat)
+        outputOffset.toNat outputSize.toNat)) ∨
+  -- The environment may end the calling frame instead (`ExternalCalls.Halt`, empty by default).
+  (∃ data,
+    external.Halt
+      { kind, gas, target, value,
+        input := readBytes st.memory inputOffset.toNat inputSize.toNat }
+      st data ∧
+    result = .halt { st with halted := some (.invalid, data) })
 
 /-- Relational execution of CREATE/CREATE2 after arity checking. The external relation executes the
 copied init code; `finishCreate` fixes memory expansion, the returned word, returndata, and the

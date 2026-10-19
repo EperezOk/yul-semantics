@@ -188,7 +188,10 @@ call-only compatibility entry point. Responses contain return data and the calle
 post-world, including global nonces and per-account persistent/transient storage. They may therefore
 summarize arbitrarily deep execution, including nested creation and callbacks into the current
 contract. Log entries carry their emitting address explicitly, so the post-world can also retain
-logs from arbitrary callees and init code. The semantics itself does not assume callee or init-code
+logs from arbitrary callees and init code. An `ExternalCalls` relation may also end the *calling*
+frame at a call (`ExternalCalls.Halt`, empty by default) with an exceptional halt, as a caller that
+cannot pay for the call runs out of gas: no environment here uses it, but a client can model such a
+halt, or mark the calls a proof reaches. The semantics itself does not assume callee or init-code
 behavior. It fixes the boundary:
 
 - caller memory is copied into the request before the external execution;
