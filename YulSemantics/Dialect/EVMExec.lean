@@ -189,6 +189,27 @@ structure ExecEnv where
   immutable     : U256 → U256 := fun _ => 0
   deriving Inhabited
 
+/-- The four EVM call-family operations. -/
+inductive CallKind
+  | call | callcode | delegatecall | staticcall
+  deriving Repr, BEq, DecidableEq, Inhabited
+
+/-- An external call a frame made (`EvmState.calls`): its kind, target, value and input, and
+whether it succeeded. No code reads it: it is a record of the run, for statements about the calls
+a run makes, such as the ether it sends. -/
+structure CallRecord where
+  /-- Which call-family instruction was used. -/
+  kind    : CallKind
+  /-- The address whose code is invoked. -/
+  target  : U256
+  /-- The call value (inherited for `delegatecall`, zero for `staticcall`). -/
+  value   : U256
+  /-- The input the callee received. -/
+  input   : List UInt8
+  /-- Whether the call succeeded. -/
+  success : Bool
+  deriving Repr, BEq, DecidableEq, Inhabited
+
 /-- The (gas-free) EVM machine state.
 
 * `memory` — byte-addressable, unbounded, default `0`.
@@ -201,7 +222,8 @@ structure ExecEnv where
 * `logs` — emitted log records, in order.
 * `selfdestructs` — accounts that executed `selfdestruct`, each paired with its `createdThisTx`
   bit, in order (see the field docstring).
-* `halted` — set once a halting built-in fires: its kind and the return/revert data. -/
+* `halted` — set once a halting built-in fires: its kind and the return/revert data.
+* `calls` — the external calls the frame made, in order (`CallRecord`), which no code reads. -/
 structure EvmState where
   /-- Byte-addressable memory, unbounded, default `0`. -/
   memory     : Nat → UInt8
@@ -225,11 +247,16 @@ structure EvmState where
   selfdestructs : List (U256 × Bool)
   /-- Set once a halting built-in fires: its kind and the return/revert data. -/
   halted     : Option (HaltKind × List UInt8)
+  /-- The external calls this frame made, in order, each with whether it succeeded (`CallRecord`).
+  The semantics only appends to it (`recordCall`), and no built-in reads it: it records the run,
+  for statements about the calls the frame made. -/
+  calls      : List CallRecord := []
 
 /-- The initial machine state: zeroed memory/storage, default environment, not halted. -/
 def EvmState.init : EvmState :=
   { memory := fun _ => 0, activeWords := 0, storage := fun _ => 0, transient := fun _ => 0,
-    env := default, returndata := [], logs := [], selfdestructs := [], halted := none }
+    env := default, returndata := [], logs := [], selfdestructs := [], halted := none,
+    calls := [] }
 
 /-! ### Frame-boundary commit vs. rollback
 
@@ -403,11 +430,6 @@ def finishSelfdestruct (st : EvmState) (beneficiary : U256) : EvmState :=
     halted := some (.selfdestruct, []) }
 
 /-! ### Open-world external calls -/
-
-/-- The four EVM call-family operations. -/
-inductive CallKind
-  | call | callcode | delegatecall | staticcall
-  deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Everything the callee can observe at a call boundary. Caller memory is represented by the
 already-copied `input`; output-memory placement remains a caller-local operation. The pre-call
@@ -622,6 +644,14 @@ def finishCall (kind : CallKind) (st : EvmState) (response : CallResponse)
   { postWorld with
     memory := copyReturn st.memory outputOffset outputSize response.returndata
     returndata := response.returndata }
+
+/-- The state after a call, `st`, with the call recorded (`EvmState.calls`): a call of kind `kind`
+to `target` (the account its low 160 bits name, `accountKey`), with `value` and `input`, that
+succeeded or not. -/
+def recordCall (kind : CallKind) (target value : U256) (input : List UInt8) (success : Bool)
+    (st : EvmState) : EvmState :=
+  { st with calls := st.calls ++
+      [{ kind, target := BitVec.ofNat 256 (accountKey target), value, input, success }] }
 
 /-- EVM word returned by the call-family built-ins. -/
 def CallResponse.flag (response : CallResponse) : U256 := if response.success then 1 else 0
@@ -864,8 +894,10 @@ def externalCall (external : ExternalCalls) (kind : CallKind) (gas target value 
         input := readBytes st.memory inputOffset.toNat inputSize.toNat }
       st response ∧
     result = .ok [response.flag]
-      (finishCall kind st response inputOffset.toNat inputSize.toNat
-        outputOffset.toNat outputSize.toNat)) ∨
+      (recordCall kind target value (readBytes st.memory inputOffset.toNat inputSize.toNat)
+        response.success
+        (finishCall kind st response inputOffset.toNat inputSize.toNat
+          outputOffset.toNat outputSize.toNat))) ∨
   -- The environment may end the calling frame instead (`ExternalCalls.Halt`, empty by default).
   (∃ data,
     external.Halt
