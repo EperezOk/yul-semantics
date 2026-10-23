@@ -246,6 +246,7 @@ example (external : ExternalCalls) (st : EvmState) (response : CallResponse)
       { kind := .call, gas := 1, target := 2, value := 3, input := [] } st response) :
     (evmWithCalls external).Builtin .call [1, 2, 3, 0, 0, 0, 0] st
       (.ok [response.flag] (recordCall .call 2 3 [] response.success
+        (decide ((3 : U256).toNat ≤ st.env.selfBalance.toNat))
         (finishCall .call st response 0 0 0 0))) := by
   have hc : ¬ (st.env.static ∧ (3 : U256) ≠ 0) := by simp [hstatic]
   simp only [evmWithCalls, evmWithExternal, builtinWithExternal, ite_eq_right hc]
@@ -292,6 +293,7 @@ example (external : ExternalCalls) (st : EvmState) (g : U256) (response : CallRe
     (evmWithCalls external).Builtin .gas [] st (.ok [g] st) ∧
     (evmWithCalls external).Builtin .call [g, 2, 3, 0, 0, 0, 0] st
       (.ok [response.flag] (recordCall .call 2 3 [] response.success
+        (decide ((3 : U256).toNat ≤ st.env.selfBalance.toNat))
         (finishCall .call st response 0 0 0 0))) := by
   refine ⟨⟨g, trivial, rfl⟩, ?_⟩
   have hc : ¬ (st.env.static ∧ (3 : U256) ≠ 0) := by simp [hstatic]
@@ -394,6 +396,7 @@ example (calls : ExternalCalls) (creates : ExternalCreates) (st : EvmState) (res
         input := readBytes st.memory 0 0 } st response) :
     builtinWithExternal calls creates gasOracle .call [1, 2, 0, 0, 0, 0, 0] st
       (.ok [response.flag] (recordCall .call 2 0 (readBytes st.memory 0 0) response.success
+        (decide ((0 : U256).toNat ≤ st.env.selfBalance.toNat))
         (finishCall .call st response 0 0 0 0))) := by
   simp only [builtinWithExternal, hstatic]
   exact .inl ⟨response, hresponse, rfl⟩
@@ -407,6 +410,7 @@ example (calls : ExternalCalls) (creates : ExternalCreates) (st : EvmState) (res
         input := readBytes st.memory 0 0 } st response) :
     builtinWithExternal calls creates gasOracle .callcode [1, 2, 3, 0, 0, 0, 0] st
       (.ok [response.flag] (recordCall .callcode 2 3 (readBytes st.memory 0 0) response.success
+        (decide ((3 : U256).toNat ≤ st.env.selfBalance.toNat))
         (finishCall .callcode st response 0 0 0 0))) := by
   simp only [builtinWithExternal]
   exact .inl ⟨response, hresponse, rfl⟩

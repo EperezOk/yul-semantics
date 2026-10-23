@@ -208,6 +208,9 @@ structure CallRecord where
   input   : List UInt8
   /-- Whether the call succeeded. -/
   success : Bool
+  /-- Whether the calling account could pay `value` when it made the call (its balance was at
+  least `value`); a call it cannot pay for fails. -/
+  funded  : Bool := true
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- The (gas-free) EVM machine state.
@@ -647,11 +650,11 @@ def finishCall (kind : CallKind) (st : EvmState) (response : CallResponse)
 
 /-- The state after a call, `st`, with the call recorded (`EvmState.calls`): a call of kind `kind`
 to `target` (the account its low 160 bits name, `accountKey`), with `value` and `input`, that
-succeeded or not. -/
-def recordCall (kind : CallKind) (target value : U256) (input : List UInt8) (success : Bool)
+succeeded or not, and that the caller could pay for or not (`funded`). -/
+def recordCall (kind : CallKind) (target value : U256) (input : List UInt8) (success funded : Bool)
     (st : EvmState) : EvmState :=
   { st with calls := st.calls ++
-      [{ kind, target := BitVec.ofNat 256 (accountKey target), value, input, success }] }
+      [{ kind, target := BitVec.ofNat 256 (accountKey target), value, input, success, funded }] }
 
 /-- EVM word returned by the call-family built-ins. -/
 def CallResponse.flag (response : CallResponse) : U256 := if response.success then 1 else 0
@@ -895,7 +898,7 @@ def externalCall (external : ExternalCalls) (kind : CallKind) (gas target value 
       st response ∧
     result = .ok [response.flag]
       (recordCall kind target value (readBytes st.memory inputOffset.toNat inputSize.toNat)
-        response.success
+        response.success (decide (value.toNat ≤ st.env.selfBalance.toNat))
         (finishCall kind st response inputOffset.toNat inputSize.toNat
           outputOffset.toNat outputSize.toNat))) ∨
   -- The environment may end the calling frame instead (`ExternalCalls.Halt`, empty by default).
